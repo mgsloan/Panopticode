@@ -8,6 +8,7 @@
 > import Render
 > import State
 > import Utils
+> import Font
 
 > import Data.Geom2.D2
 
@@ -27,7 +28,8 @@
 > idle state = do
 >  env <- GL.get state
 >  time <- GL.get GL.elapsedTime
->  state $= tick time env
+>  newbufs <- fillTextureData (TextRenderContext (editorFnt env) (-1) 4 "") (bufs env)
+>  state $= tick time (env { bufs = newbufs })
 >  GL.postRedisplay Nothing
 
 > keyboardMouse window _ (GL.Char '\ESC') GL.Down _ _ = do
