@@ -11,7 +11,9 @@
 > import Control.Arrow ((***))
 > import Debug.Trace
 > import TinyFont
+> import Data.Geom2.D2 (mapT)
 
+> display :: IORef EditorState -> IO ()
 > display state = do
 >  clear [ColorBuffer , DepthBuffer]
 >  env <- get state
@@ -44,19 +46,20 @@
            fnt = editorFnt st; (posx, posy) = editorOffset st; (charw, charh) = bothFromI $ fntCharSize fnt
 
 > render st = do
->    let b1 = head $ bufs st;
->        (Just tex) = textureCache b1
+>    let obj = head . editorChunks $ st
+>        tex = objTexture obj
+>        (posx, posy) = mapT fromIntegral $ objPosition obj - editorOffset st
 >    texture Texture2D $= Enabled
->    textureBinding Texture2D $= (Just $ tex)
->    translate (Vector3 (-posx) posy (0.0 :: GLfloat))
->    (TextureSize2D width height) <- get (textureSize2D (Left Texture2D) 0)
+>    --textureBinding Texture2D $= (Just $ tex)
+>    translate (Vector3 posx posy (0.0 :: GLfloat))
+>    --(TextureSize2D width height) <- get (textureSize2D (Left Texture2D) 0)
+>    let (width,height) = (100,200)
 >    renderPrimitive Quads (do vert (0,0,-95) (0,0)
 >                              vert (fromIntegral width,0,-95) (1,0)
 >                              vert (fromIntegral width,fromIntegral height,-95) (1,1)
 >                              vert (0,fromIntegral height,-95) (0,1))
->    translate (Vector3 posx (-posy) (0.0 :: GLfloat))
+>    translate (Vector3 (-posx) (-posy) (0.0 :: GLfloat))
 >    texture Texture2D $= Disabled
->  where (posx, posy) = editorOffset st
 
 >
 > initGL name = do

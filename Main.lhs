@@ -14,6 +14,15 @@
 
 > type WindowId = Int
 
+Here is the entry function of the program.  It passes off control to GLUT, after establishing a few callbacks.
+I wish we didn't have to pass control over to GLUT - this should be amended at some point, I want to make sure
+that it's impossible for the program to become unresponsive.  This means that all of the processing must take
+place in threads which
+
+A)  Execute rapidly
+B)  Update state incrementally, such that visualizations of partially optimized layouts look decent
+
+> main :: IO ()
 > main = do
 >  (progname, _) <- GL.getArgsAndInitialize
 >  window <- initGL "Project Visualizer"
@@ -25,11 +34,11 @@
 >  GL.passiveMotionCallback $= Just (mouseMoveHandler state)
 >  GL.mainLoop
 
+> idle :: IORef EditorState -> IO ()
 > idle state = do
 >  env <- GL.get state
 >  time <- GL.get GL.elapsedTime
->  newbufs <- fillTextureData (TextRenderContext (editorFnt env) (-1) 4 "") (bufs env)
->  state $= tick time (env { bufs = newbufs })
+>  state $= tick time env
 >  GL.postRedisplay Nothing
 
 > keyboardMouse window _ (GL.Char '\ESC') GL.Down _ _ = do
@@ -37,24 +46,21 @@
 >   exitWith ExitSuccess
 > keyboardMouse _ state key st mod pos = do
 >  env <- GL.get state
->  print (mouseState $ env)
 >  state $= userAction env key st mod pos
-> mouseMoveHandler state pos = do
+> mouseMoveHandler state (GL.Position x y) = do
 >  env <- GL.get state
->  state $= mouseMove env pos
+>  state $= mouseMove env (fromIntegral x, fromIntegral y)
 
 > setMouse :: EditorState -> GL.MouseButton -> GL.KeyState -> EditorState
-> setMouse x mb st = x { mouseState = ( mst { buttonState = mutateList num False (st==GL.Down) $ buttonState mst }) }
+> setMouse x mb st = x { editorMouse = ( mst { mouseButtons = mutateList num False (st==GL.Down) $ mouseButtons mst }) }
 >     where num = case mb of GL.LeftButton -> 0; GL.MiddleButton -> 1; GL.RightButton -> 2
->           mst = mouseState x
+>           mst = editorMouse x
 
 > userAction :: EditorState -> GL.Key -> GL.KeyState -> GL.Modifiers -> GL.Position -> EditorState
 > userAction x (GL.MouseButton mb) st _ _ = setMouse x mb st
 > userAction x _ _ _ _ = x
 
-> mouseMove :: EditorState -> GL.Position -> EditorState
-> mouseMove st p@(GL.Position x y) = st { mouseState = oldState { mousePos = p },
->      editorOffset = editorOffset st + (if (not . checkList False 0 . buttonState $ oldState) then (0,0) else offset) }
->     where oldState = mouseState st
->           oldPos@(GL.Position ox oy) = (mousePos oldState)
->           offset = (fromIntegral (ox-x), fromIntegral (y-oy))
+> mouseMove :: EditorState -> (Int, Int) -> EditorState
+> mouseMove st p = st { editorMouse = old { mousePosition = p }, editorOffset = off }
+>     where old = editorMouse st
+>           off = editorOffset st + (if (not . checkList False 0 . mouseButtons $ old) then (0,0) else mousePosition old - p)

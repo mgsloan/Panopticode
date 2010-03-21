@@ -13,6 +13,7 @@
 
 > type Edge a = [a]
 > data EdgeZipper a = EdgeZipper { ypos :: Int,  ezip :: (Z.Zipper a) }
+> data Channel a = Channel { leftEdge, rightEdge :: Edge a }
 
 > positions :: [a] -> [Int] -> [a]
 > positions xs = edgePositions (newEdgeZipper xs)
@@ -26,5 +27,7 @@
 >     | y >  cy = EdgeZipper (cy-1) (Z.left z)
 >     | y <  cy = EdgeZipper (cy+1) (Z.right z)
 
-> edgePositions ez (y:ys) = leftZ z : edgePositions sz ys
+Assumes sorted input, seeks an edgeZipper to different positions, and samples the values.
+
+> edgePositions ez (y:ys) = rightZ z : edgePositions sz ys
 >     where sz@(EdgeZipper _ z) = seek y ez

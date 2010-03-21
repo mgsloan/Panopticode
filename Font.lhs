@@ -1,7 +1,7 @@
 > module Font where
 > 
 > import Data.Bits
-> import Data.Char (ord, chr)
+> import Data.Char (ord, chr, isSpace)
 > import Data.List (minimumBy, transpose)
 > import Data.Ord  (comparing)
 > import Data.Maybe (fromJust)
@@ -31,41 +31,40 @@
 
 > replace x y = concatMap (\z -> if z == x then y else [z])
 
-> data TextRenderContext = TextRenderContext {txtFont :: MonoFont, txtMaxWidth, tabSize :: Int, wrapString :: String}
+> data TextLayoutContext = TextLayoutContext {
+>      tlcWidth, tlcTabSize :: Int,
+>      tlcWrap :: String }
 
 > initTail :: [a] -> ([a], a)
 > initTail [x]    =  ([], x)
 > initTail (x:xs) =  (x : ys, v) where (ys,v) = initTail xs
 > initTail []     =  error "initTail: empty list"
 
-> processContext :: TextRenderContext -> String -> (Int, [String])
-> processContext (TextRenderContext (MonoFont charsz Nothing tex) maxWidth tabSize wrapString) str = (width, wrappedLines)
->  where ls = lines . replace '\t' (replicate tabSize ' ') $ str
->        width = maximum . (if maxWidth == -1 then id else (maxWidth:)) $ map length ls
->        wrappedLines :: [String]
->        wrappedLines = concatMap (wrapLine . breakEvery (width-1)) ls
->            where wrapLine :: [String] -> [String]
->                  wrapLine [] = []
->                  wrapLine xs = (\(a,b) -> a++[b]) . first (map (++wrapString)) . initTail $ xs
+> layoutText :: TextLayoutContext -> String -> [String]
+> layoutText context str | tlcWidth context == -1 = ls
+>                        | otherwise = concatMap (processLines . initTail . breakEvery (tlcWidth context)) ls
+>  where ls = lines . replace '\t' (replicate (tlcTabSize context) ' ') $ str
+>        processLines (xs,l) = map (++(tlcWrap context)) xs ++ [reverse . dropWhile isSpace . reverse $ l]
 
-> drawText :: MonoFont -> (Int, [String]) -> IO TextureObject
-> drawText (MonoFont charsz _ tex) (width, wrappedLines) = do
+> drawText :: MonoFont -> [String] -> IO TextureObject
+> drawText (MonoFont charsz _ tex) wrappedLines = do
 >      [texName] <- genObjectNames 1
 >      textureBinding Texture2D $= Just texName
 >      textureFilter Texture2D $= ((Nearest, Just Nearest), Nearest)
 >      newArray dat >>= texImage2D Nothing NoProxy 0 Luminance' tsz2d 0 . PixelData Luminance UnsignedByte
 >      textureBinding Texture2D $= Nothing
 >      return texName
->  where tsz = ceilPow $ charsz * (width, length wrappedLines)
+>  where width = maximum . map length $ wrappedLines
+>        tsz = ceilPow $ charsz * (width, length wrappedLines)
 >        tsz2d = uncurry TextureSize2D . bothFromI $ tsz
 >        dat :: [GLubyte]
 >        dat = concat . padRight (snd tsz) (replicate (fst tsz) 0) $
 >              concatMap (\line -> map (padRight (fst tsz) 0) $ concatMap (\ix -> map (lookup ix) line) [0..snd charsz-1]) wrappedLines
 >            where lookup ix x = maybe ([0,0,0]) id $ M.lookup (ix, x) tex
 
-> drawFont :: MonoFont -> IO TextureObject
-> drawFont mf = drawText mf . processContext (TextRenderContext mf (-1) 0 "") $ [minimum chars..maximum chars]
->   where chars = map (snd.fst) . M.toList $ fntDat mf
+ drawFont :: MonoFont -> IO TextureObject
+ drawFont mf = drawText mf . processContext (TextLayoutContext (-1) 0 "") $ [minimum chars..maximum chars]
+   where chars = map (snd.fst) . M.toList $ fntDat mf
 
 > corner dir = case dir of 0 -> (0,0); 1 -> (1,0); 2 -> (1,1); 3 -> (0,1)
 

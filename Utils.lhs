@@ -29,3 +29,7 @@
 > breakEvery _ [] = []
 > breakEvery n xs = cur : (breakEvery n rest)
 >    where (cur, rest) = splitAt n xs
+
+> infixr 8 ><
+> (><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+> (f >< g) (x,y) = (f x,g y)

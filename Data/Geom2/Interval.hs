@@ -62,3 +62,6 @@ intervalMapping fr@(Interval f1 _) to@(Interval f2 _) a = (a - f1) * (extent to 
 
 wrapIntoInterval :: (RealFrac a, Ord a) => Interval a -> a -> a
 wrapIntoInterval i = intervalMapping (Interval 0 1) i . (\x -> (if x < 0 then (1+) else id) $ snd (properFraction x)) . intervalMapping i (Interval 0 1)
+
+sliceList :: Interval Int -> [a] -> [a]
+sliceList (Interval f t) = take (t - f + 1) . drop f
